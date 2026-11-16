@@ -1,0 +1,18 @@
+cloudflare_api_token = "replace-with-api-token"
+account_id           = "replace-with-account-id"
+environment          = "production"
+worker_script_name   = "socavones-zmg-api"
+
+db_host     = "db.example.com"
+db_port     = 5432
+db_name     = "socavones_zmg"
+db_user     = "socavones_app"
+db_password = "replace-with-db-password"
+
+turnstile_domains = ["socavones-zmg-api.example.workers.dev"]
+admin_seed_token  = "replace-with-strong-random-token"
+
+# Opcional:
+# zone_id              = "replace-with-zone-id"
+# custom_route_pattern = "socavones.tudominio.mx/*"
+

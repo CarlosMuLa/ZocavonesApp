@@ -1,0 +1,22 @@
+name = "socavones-zmg-api"
+main = "src/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "../frontend/dist"
+binding = "ASSETS"
+
+[vars]
+ENVIRONMENT = "development"
+
+# Configure in Cloudflare Dashboard or Terraform:
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "<HYPERDRIVE_CONFIG_ID>"
+#
+# Secrets (wrangler secret put / Terraform):
+# - TURNSTILE_SITEKEY
+# - TURNSTILE_SECRET
+# - ADMIN_SEED_TOKEN
+

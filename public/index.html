@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registro Ciudadano de Socavones — ZMG</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            border: 'hsl(var(--border))',
+            input: 'hsl(var(--input))',
+            ring: 'hsl(var(--ring))',
+            background: 'hsl(var(--background))',
+            foreground: 'hsl(var(--foreground))',
+            primary: {
+              DEFAULT: 'hsl(var(--primary))',
+              foreground: 'hsl(var(--primary-foreground))',
+            },
+            secondary: {
+              DEFAULT: 'hsl(var(--secondary))',
+              foreground: 'hsl(var(--secondary-foreground))',
+            },
+            destructive: {
+              DEFAULT: 'hsl(var(--destructive))',
+              foreground: 'hsl(var(--destructive-foreground))',
+            },
+            muted: {
+              DEFAULT: 'hsl(var(--muted))',
+              foreground: 'hsl(var(--muted-foreground))',
+            },
+            accent: {
+              DEFAULT: 'hsl(var(--accent))',
+              foreground: 'hsl(var(--accent-foreground))',
+            },
+            card: {
+              DEFAULT: 'hsl(var(--card))',
+              foreground: 'hsl(var(--card-foreground))',
+            },
+          },
+          borderRadius: {
+            lg: 'var(--radius)',
+            md: 'calc(var(--radius) - 2px)',
+            sm: 'calc(var(--radius) - 4px)',
+          },
+        },
+      },
+    };
+  </script>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <link rel="stylesheet" href="https://unpkg.com/sileo-vanilla/dist/styles.css" />
+  <script src="https://unpkg.com/sileo-vanilla/dist/sileo.iife.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
+  <style>
+    :root {
+      --background: 0 0% 100%;
+      --foreground: 240 10% 3.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 240 10% 3.9%;
+      --primary: 240 5.9% 10%;
+      --primary-foreground: 0 0% 98%;
+      --secondary: 240 4.8% 95.9%;
+      --secondary-foreground: 240 5.9% 10%;
+      --muted: 240 4.8% 95.9%;
+      --muted-foreground: 240 3.8% 46.1%;
+      --accent: 240 4.8% 95.9%;
+      --accent-foreground: 240 5.9% 10%;
+      --destructive: 0 84.2% 60.2%;
+      --destructive-foreground: 0 0% 98%;
+      --border: 240 5.9% 90%;
+      --input: 240 5.9% 90%;
+      --ring: 240 5.9% 10%;
+      --radius: 0.5rem;
+    }
+
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    #map {
+      min-height: 440px;
+      height: 100%;
+    }
+
+    input:user-invalid,
+    select:user-invalid {
+      border-color: hsl(var(--destructive));
+    }
+
+    dialog::backdrop {
+      background: rgba(9, 9, 11, 0.55);
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-muted/40 text-foreground antialiased">
+  <header class="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
+      <div class="flex flex-col">
+        <h1 class="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+          Registro Ciudadano de Socavones
+        </h1>
+        <p class="text-xs text-muted-foreground sm:text-sm">
+          Zona Metropolitana de Guadalajara (ZMG) — Reporte georreferenciado
+        </p>
+      </div>
+      <span class="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
+        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+        Reporte activo
+      </span>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      <!-- Columna Mapa (shadcn Card) -->
+      <section class="lg:col-span-7">
+        <div class="rounded-lg border border-border bg-card p-4 text-card-foreground shadow-sm">
+          <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <form id="search-form" class="flex flex-1 gap-2" novalidate>
+              <input
+                id="search-input"
+                type="text"
+                placeholder="Buscar calle o colonia en la ZMG..."
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+              <button
+                type="submit"
+                id="search-btn"
+                class="inline-flex h-10 shrink-0 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Buscar
+              </button>
+            </form>
+            <button
+              type="button"
+              id="gps-btn"
+              class="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-md border border-input bg-background px-3.5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41M12 8a4 4 0 100 8 4 4 0 000-8z" />
+              </svg>
+              Usar mi GPS
+            </button>
+          </div>
+
+          <ul id="search-results" class="mb-3 hidden max-h-40 divide-y divide-border overflow-y-auto rounded-md border border-border bg-background text-sm shadow-sm"></ul>
+
+          <div class="relative h-[440px] w-full overflow-hidden rounded-md border border-border lg:h-[560px]">
+            <div id="map" class="h-full w-full"></div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span>Haz clic en el mapa o arrastra el pin para ubicar el socavón.</span>
+            <span id="geocode-status" class="hidden font-medium text-foreground">
+              Consultando dirección en Nominatim...
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Columna Formulario (shadcn Card) -->
+      <section class="lg:col-span-5">
+        <div class="rounded-lg border border-border bg-card p-6 text-card-foreground shadow-sm">
+          <div class="mb-5 space-y-1">
+            <h2 class="text-lg font-semibold leading-none tracking-tight">Datos del incidente</h2>
+            <p class="text-xs text-muted-foreground">
+              Colonia, calle principal y municipio se actualizan automáticamente al mover el pin.
+            </p>
+          </div>
+
+          <!-- shadcn Alert Destructive: Bounding Box ZMG -->
+          <div
+            id="bbox-alert"
+            role="alert"
+            class="mb-4 hidden rounded-lg border border-destructive/50 bg-destructive/10 p-3.5 text-sm text-destructive"
+          >
+            <div class="font-semibold leading-none tracking-tight">Ubicación fuera de la ZMG</div>
+            <p class="mt-1.5 text-xs leading-relaxed">
+              Las coordenadas deben estar dentro del rango permitido (latitud 20.40 a 20.85, longitud -103.60 a -103.15). El envío está bloqueado hasta corregir la ubicación.
+            </p>
+          </div>
+
+          <form id="socavon-form" class="space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+              <div class="space-y-1.5">
+                <label for="latitud" class="text-xs font-medium leading-none">
+                  Latitud <span class="text-destructive">*</span>
+                </label>
+                <input
+                  id="latitud"
+                  name="latitud"
+                  type="number"
+                  step="0.000001"
+                  required
+                  value="20.670000"
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm tabular-nums ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
+              <div class="space-y-1.5">
+                <label for="longitud" class="text-xs font-medium leading-none">
+                  Longitud <span class="text-destructive">*</span>
+                </label>
+                <input
+                  id="longitud"
+                  name="longitud"
+                  type="number"
+                  step="0.000001"
+                  required
+                  value="-103.350000"
+                  class="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm tabular-nums ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                />
+              </div>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="fecha_incidente" class="text-sm font-medium leading-none">
+                Fecha del incidente <span class="text-destructive">*</span>
+              </label>
+              <input
+                id="fecha_incidente"
+                name="fecha_incidente"
+                type="date"
+                min="2018-01-01"
+                required
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="municipio" class="text-sm font-medium leading-none">
+                Municipio <span class="text-destructive">*</span>
+              </label>
+              <select
+                id="municipio"
+                name="municipio"
+                required
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selecciona un municipio...</option>
+                <option value="Guadalajara">Guadalajara</option>
+                <option value="Zapopan">Zapopan</option>
+                <option value="San Pedro Tlaquepaque">San Pedro Tlaquepaque</option>
+                <option value="Tonalá">Tonalá</option>
+                <option value="Tlajomulco de Zúñiga">Tlajomulco de Zúñiga</option>
+                <option value="El Salto">El Salto</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="colonia" class="text-sm font-medium leading-none">
+                Colonia
+              </label>
+              <input
+                id="colonia"
+                name="colonia"
+                type="text"
+                maxlength="120"
+                placeholder="Se completa al mover el pin"
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="calle_principal" class="text-sm font-medium leading-none">
+                Calle principal
+              </label>
+              <input
+                id="calle_principal"
+                name="calle_principal"
+                type="text"
+                maxlength="150"
+                placeholder="Se completa al mover el pin"
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="cruces" class="text-sm font-medium leading-none">
+                Cruces o referencia
+              </label>
+              <input
+                id="cruces"
+                name="cruces"
+                type="text"
+                maxlength="150"
+                placeholder="Ej. Entre Av. Vallarta y Calle Morelos"
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              />
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="causa_aparente" class="text-sm font-medium leading-none">
+                Causa aparente <span class="text-destructive">*</span>
+              </label>
+              <select
+                id="causa_aparente"
+                name="causa_aparente"
+                required
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selecciona una causa...</option>
+                <option value="Lluvia / Inundación">Lluvia / Inundación</option>
+                <option value="Fuga o colapso de drenaje">Fuga o colapso de drenaje</option>
+                <option value="Fuga de agua potable">Fuga de agua potable</option>
+                <option value="Obra / Desconocida">Obra / Desconocida</option>
+              </select>
+            </div>
+
+            <div class="space-y-1.5">
+              <label for="tamano_categoria" class="text-sm font-medium leading-none">
+                Tamaño estimado
+              </label>
+              <select
+                id="tamano_categoria"
+                name="tamano_categoria"
+                class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Selecciona un tamaño (opcional)...</option>
+                <option value="Pequeño (< 1 m)">Pequeño (&lt; 1 m)</option>
+                <option value="Mediano (1–3 m)">Mediano (1–3 m)</option>
+                <option value="Grande (> 3 m)">Grande (&gt; 3 m)</option>
+              </select>
+            </div>
+
+            <div id="turnstile-container" class="hidden pt-1"></div>
+
+            <button
+              id="submit-btn"
+              type="submit"
+              class="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              Enviar reporte de socavón
+            </button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- shadcn AlertDialog / Dialog: Prevención de duplicados -->
+  <dialog
+    id="duplicate-modal"
+    class="w-full max-w-lg rounded-lg border border-border bg-card p-6 text-card-foreground shadow-lg"
+  >
+    <div class="space-y-2 text-left">
+      <h3 class="text-lg font-semibold leading-none tracking-tight">
+        Posible socavón duplicado detectado
+      </h3>
+      <p class="text-sm text-muted-foreground">
+        Ya existe un reporte registrado a menos de 50 metros y dentro de ±30 días.
+      </p>
+    </div>
+
+    <div class="my-4 rounded-md border border-border bg-muted/50 p-3.5">
+      <dl class="space-y-2 text-xs">
+        <div class="flex justify-between gap-3">
+          <dt class="font-medium text-muted-foreground">Fecha:</dt>
+          <dd id="dup-fecha" class="font-semibold text-foreground"></dd>
+        </div>
+        <div class="flex justify-between gap-3">
+          <dt class="font-medium text-muted-foreground">Ubicación:</dt>
+          <dd id="dup-ubicacion" class="text-right text-foreground"></dd>
+        </div>
+        <div class="flex justify-between gap-3">
+          <dt class="font-medium text-muted-foreground">Causa:</dt>
+          <dd id="dup-causa" class="text-foreground"></dd>
+        </div>
+        <div class="flex justify-between gap-3">
+          <dt class="font-medium text-muted-foreground">Reportes sumados:</dt>
+          <dd id="dup-sumados" class="font-semibold text-foreground"></dd>
+        </div>
+      </dl>
+    </div>
+
+    <p class="mb-4 text-xs text-muted-foreground">
+      ¿Deseas sumar tu reporte a este registro existente o confirmar que se trata de un evento distinto?
+    </p>
+
+    <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button
+        type="button"
+        id="dup-cancel-btn"
+        class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        Cancelar
+      </button>
+      <button
+        type="button"
+        id="dup-force-btn"
+        class="inline-flex h-9 items-center justify-center rounded-md border border-input bg-secondary px-3 text-xs font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+      >
+        Confirmar evento distinto
+      </button>
+      <button
+        type="button"
+        id="dup-sumar-btn"
+        class="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+      >
+        Sumar a este socavón existente
+      </button>
+    </div>
+  </dialog>
+
+  <script>
+    const ZMG_CENTER = [20.67, -103.35];
+    const ZMG_BOUNDS = {
+      minLat: 20.40,
+      maxLat: 20.85,
+      minLng: -103.60,
+      maxLng: -103.15,
+    };
+
+    const form = document.getElementById('socavon-form');
+    const latInput = document.getElementById('latitud');
+    const lngInput = document.getElementById('longitud');
+    const fechaInput = document.getElementById('fecha_incidente');
+    const municipioSelect = document.getElementById('municipio');
+    const coloniaInput = document.getElementById('colonia');
+    const calleInput = document.getElementById('calle_principal');
+    const crucesInput = document.getElementById('cruces');
+    const causaSelect = document.getElementById('causa_aparente');
+    const tamanoSelect = document.getElementById('tamano_categoria');
+    const bboxAlert = document.getElementById('bbox-alert');
+    const submitBtn = document.getElementById('submit-btn');
+    const geocodeStatus = document.getElementById('geocode-status');
+    const searchForm = document.getElementById('search-form');
+    const searchInput = document.getElementById('search-input');
+    const searchResults = document.getElementById('search-results');
+    const gpsBtn = document.getElementById('gps-btn');
+
+    const dupModal = document.getElementById('duplicate-modal');
+    const dupFecha = document.getElementById('dup-fecha');
+    const dupUbicacion = document.getElementById('dup-ubicacion');
+    const dupCausa = document.getElementById('dup-causa');
+    const dupSumados = document.getElementById('dup-sumados');
+    const dupSumarBtn = document.getElementById('dup-sumar-btn');
+    const dupForceBtn = document.getElementById('dup-force-btn');
+    const dupCancelBtn = document.getElementById('dup-cancel-btn');
+
+    let reverseAbortController = null;
+    let turnstileWidgetId = null;
+    let turnstileToken = null;
+    let turnstileEnabled = false;
+    let pendingPayload = null;
+    let duplicateRecord = null;
+    let wasInBounds = true;
+
+    function notifyState(type, title, description = '') {
+      if (window.sileo && typeof window.sileo[type] === 'function') {
+        window.sileo[type]({ title, description });
+      }
+    }
+
+    // Fecha máxima = hoy
+    const todayIso = new Date().toISOString().slice(0, 10);
+    fechaInput.max = todayIso;
+    fechaInput.value = todayIso;
+
+    // Inicializar mapa Leaflet 1.9.4
+    const map = L.map('map').setView(ZMG_CENTER, 12);
+    L.tileLayer(
+      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri',
+      }
+    ).addTo(map);
+
+    // Referencia visual del Bounding Box ZMG
+    L.rectangle(
+      [
+        [ZMG_BOUNDS.minLat, ZMG_BOUNDS.minLng],
+        [ZMG_BOUNDS.maxLat, ZMG_BOUNDS.maxLng],
+      ],
+      {
+        color: '#18181b',
+        weight: 1.5,
+        dashArray: '6 6',
+        fillOpacity: 0.03,
+        interactive: false,
+      }
+    ).addTo(map);
+
+    const marker = L.marker(ZMG_CENTER, { draggable: true }).addTo(map);
+
+    function isWithinBounds(lat, lng) {
+      return (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        lat >= ZMG_BOUNDS.minLat &&
+        lat <= ZMG_BOUNDS.maxLat &&
+        lng >= ZMG_BOUNDS.minLng &&
+        lng <= ZMG_BOUNDS.maxLng
+      );
+    }
+
+    function validateBoundingBoxUI(lat, lng, notifyOnExit = false) {
+      const valid = isWithinBounds(lat, lng);
+      bboxAlert.classList.toggle('hidden', valid);
+      submitBtn.disabled = !valid;
+
+      if (notifyOnExit && !valid && wasInBounds) {
+        notifyState(
+          'warning',
+          'Ubicación fuera de la ZMG',
+          'Mueve el pin dentro del área metropolitana para habilitar el envío.'
+        );
+      }
+      wasInBounds = valid;
+      return valid;
+    }
+
+    function normalizeMunicipio(raw) {
+      if (!raw) return 'Otro';
+      const text = raw
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+      if (text.includes('guadalajara')) return 'Guadalajara';
+      if (text.includes('zapopan')) return 'Zapopan';
+      if (text.includes('tlaquepaque')) return 'San Pedro Tlaquepaque';
+      if (text.includes('tonala')) return 'Tonalá';
+      if (text.includes('tlajomulco')) return 'Tlajomulco de Zúñiga';
+      if (text.includes('el salto')) return 'El Salto';
+      return 'Otro';
+    }
+
+    async function reverseGeocode(lat, lng) {
+      if (reverseAbortController) {
+        reverseAbortController.abort();
+      }
+      reverseAbortController = new AbortController();
+      geocodeStatus.classList.remove('hidden');
+
+      try {
+        const url = new URL('https://nominatim.openstreetmap.org/reverse');
+        url.searchParams.set('format', 'jsonv2');
+        url.searchParams.set('lat', String(lat));
+        url.searchParams.set('lon', String(lng));
+        url.searchParams.set('addressdetails', '1');
+        url.searchParams.set('accept-language', 'es');
+
+        const res = await fetch(url.toString(), {
+          signal: reverseAbortController.signal,
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const addr = data.address || {};
+
+        const colonia =
+          addr.suburb ||
+          addr.neighbourhood ||
+          addr.quarter ||
+          addr.residential ||
+          addr.village ||
+          '';
+        const calle =
+          addr.road || addr.pedestrian || addr.footway || addr.path || '';
+        const muniRaw =
+          addr.city || addr.town || addr.municipality || addr.county || '';
+
+        // Sobrescribir siempre automáticamente colonia, calle_principal y municipio
+        coloniaInput.value = colonia;
+        calleInput.value = calle;
+        municipioSelect.value = normalizeMunicipio(muniRaw);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          notifyState(
+            'warning',
+            'Sin respuesta de Nominatim',
+            'No se pudo obtener la dirección automática; puedes editarla manualmente.'
+          );
+        }
+      } finally {
+        geocodeStatus.classList.add('hidden');
+      }
+    }
+
+    function updatePinPosition(lat, lng, options = {}) {
+      const { panMap = false, zoom = null, runReverse = true } = options;
+      const fixedLat = Number(lat.toFixed(6));
+      const fixedLng = Number(lng.toFixed(6));
+
+      latInput.value = fixedLat.toFixed(6);
+      lngInput.value = fixedLng.toFixed(6);
+      marker.setLatLng([fixedLat, fixedLng]);
+
+      if (panMap) {
+        if (zoom !== null) {
+          map.setView([fixedLat, fixedLng], zoom);
+        } else {
+          map.panTo([fixedLat, fixedLng]);
+        }
+      }
+
+      validateBoundingBoxUI(fixedLat, fixedLng, true);
+      if (runReverse) {
+        reverseGeocode(fixedLat, fixedLng);
+      }
+    }
+
+    map.on('click', (e) => {
+      updatePinPosition(e.latlng.lat, e.latlng.lng);
+    });
+
+    marker.on('dragend', () => {
+      const pos = marker.getLatLng();
+      updatePinPosition(pos.lat, pos.lng);
+    });
+
+    function handleManualCoordChange() {
+      const lat = Number.parseFloat(latInput.value);
+      const lng = Number.parseFloat(lngInput.value);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        validateBoundingBoxUI(NaN, NaN, true);
+        return;
+      }
+      marker.setLatLng([lat, lng]);
+      map.panTo([lat, lng]);
+      if (validateBoundingBoxUI(lat, lng, true)) {
+        reverseGeocode(lat, lng);
+      }
+    }
+
+    latInput.addEventListener('change', handleManualCoordChange);
+    lngInput.addEventListener('change', handleManualCoordChange);
+
+    // Búsqueda por calle / colonia en Nominatim
+    searchForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const query = searchInput.value.trim();
+      if (!query) return;
+
+      searchResults.innerHTML =
+        '<li class="px-3 py-2 text-xs text-muted-foreground">Buscando ubicaciones...</li>';
+      searchResults.classList.remove('hidden');
+
+      try {
+        const url = new URL('https://nominatim.openstreetmap.org/search');
+        url.searchParams.set('format', 'jsonv2');
+        url.searchParams.set('q', `${query}, Guadalajara, Jalisco, Mexico`);
+        url.searchParams.set(
+          'viewbox',
+          `${ZMG_BOUNDS.minLng},${ZMG_BOUNDS.maxLat},${ZMG_BOUNDS.maxLng},${ZMG_BOUNDS.minLat}`
+        );
+        url.searchParams.set('limit', '5');
+        url.searchParams.set('accept-language', 'es');
+
+        const res = await fetch(url.toString(), {
+          headers: { Accept: 'application/json' },
+        });
+        const items = await res.json();
+
+        if (!Array.isArray(items) || items.length === 0) {
+          searchResults.classList.add('hidden');
+          notifyState('warning', 'Sin resultados', 'No se encontraron coincidencias en la ZMG.');
+          return;
+        }
+
+        searchResults.innerHTML = '';
+        items.forEach((item) => {
+          const li = document.createElement('li');
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className =
+            'w-full px-3 py-2 text-left text-xs text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
+          btn.textContent = item.display_name;
+          btn.addEventListener('click', () => {
+            searchResults.classList.add('hidden');
+            updatePinPosition(Number(item.lat), Number(item.lon), {
+              panMap: true,
+              zoom: 16,
+            });
+          });
+          li.appendChild(btn);
+          searchResults.appendChild(li);
+        });
+      } catch {
+        searchResults.classList.add('hidden');
+        notifyState('error', 'Error de búsqueda', 'No se pudo consultar Nominatim.');
+      }
+    });
+
+    // Geolocalización GPS
+    gpsBtn.addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        notifyState('error', 'GPS no disponible', 'Tu navegador no soporta geolocalización.');
+        return;
+      }
+      gpsBtn.disabled = true;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          gpsBtn.disabled = false;
+          updatePinPosition(pos.coords.latitude, pos.coords.longitude, {
+            panMap: true,
+            zoom: 16,
+          });
+          notifyState('success', 'Ubicación GPS capturada', 'Pin actualizado con tu posición actual.');
+        },
+        (err) => {
+          gpsBtn.disabled = false;
+          notifyState('error', 'Error de GPS', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    });
+
+    async function initTurnstile() {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) return;
+        const cfg = await res.json();
+        if (!cfg.turnstileSitekey) return;
+
+        turnstileEnabled = true;
+        const container = document.getElementById('turnstile-container');
+        container.classList.remove('hidden');
+
+        const renderWidget = () => {
+          if (!window.turnstile) {
+            setTimeout(renderWidget, 200);
+            return;
+          }
+          turnstileWidgetId = window.turnstile.render('#turnstile-container', {
+            sitekey: cfg.turnstileSitekey,
+            callback: (token) => {
+              turnstileToken = token;
+            },
+            'expired-callback': () => {
+              turnstileToken = null;
+            },
+          });
+        };
+        renderWidget();
+      } catch {
+        // Turnstile opcional en desarrollo local sin configuración
+      }
+    }
+
+    function openDuplicateModal(dup) {
+      duplicateRecord = dup;
+      const fecha = String(dup.fecha_incidente || '').slice(0, 10);
+      const partesUbicacion = [
+        dup.calle_principal,
+        dup.colonia,
+        dup.municipio,
+      ].filter(Boolean);
+      const distText =
+        dup.distancia_m !== undefined ? ` (~${dup.distancia_m} m)` : '';
+
+      dupFecha.textContent = fecha;
+      dupUbicacion.textContent = `${partesUbicacion.join(', ')}${distText}`;
+      dupCausa.textContent = dup.causa_aparente || 'No especificada';
+      dupSumados.textContent = String(dup.reportes_sumados ?? 1);
+
+      dupModal.showModal();
+    }
+
+    function resetAfterSuccess(title, description) {
+      notifyState('success', title, description);
+      crucesInput.value = '';
+      causaSelect.value = '';
+      tamanoSelect.value = '';
+      if (turnstileEnabled && window.turnstile && turnstileWidgetId !== null) {
+        window.turnstile.reset(turnstileWidgetId);
+        turnstileToken = null;
+      }
+    }
+
+    async function submitReport(payload) {
+      submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/socavones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (res.status === 409 && data.duplicado) {
+          pendingPayload = payload;
+          notifyState(
+            'warning',
+            'Posible duplicado detectado',
+            'Revisa el registro cercano antes de confirmar.'
+          );
+          openDuplicateModal(data.duplicado);
+          return;
+        }
+
+        if (!res.ok) {
+          notifyState('error', 'No se pudo registrar', data.error || 'Error al guardar el socavón.');
+          return;
+        }
+
+        resetAfterSuccess(
+          `Reporte #${data.socavon.id} registrado`,
+          `Guardado correctamente en ${data.socavon.municipio}.`
+        );
+      } catch {
+        notifyState('error', 'Error de conexión', 'No fue posible comunicarse con el servidor.');
+      } finally {
+        const lat = Number.parseFloat(latInput.value);
+        const lng = Number.parseFloat(lngInput.value);
+        validateBoundingBoxUI(lat, lng, false);
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const lat = Number.parseFloat(latInput.value);
+      const lng = Number.parseFloat(lngInput.value);
+      if (!validateBoundingBoxUI(lat, lng, true)) return;
+
+      if (turnstileEnabled && !turnstileToken) {
+        notifyState(
+          'warning',
+          'Verificación requerida',
+          'Completa el widget anti-spam de Turnstile antes de enviar.'
+        );
+        return;
+      }
+
+      const payload = {
+        fecha_incidente: fechaInput.value,
+        municipio: municipioSelect.value,
+        colonia: coloniaInput.value.trim(),
+        calle_principal: calleInput.value.trim(),
+        cruces: crucesInput.value.trim(),
+        latitud: lat,
+        longitud: lng,
+        causa_aparente: causaSelect.value,
+        tamano_categoria: tamanoSelect.value || null,
+        turnstile_token: turnstileToken,
+      };
+
+      await submitReport(payload);
+    });
+
+    dupCancelBtn.addEventListener('click', () => {
+      dupModal.close();
+      pendingPayload = null;
+      duplicateRecord = null;
+    });
+
+    dupSumarBtn.addEventListener('click', async () => {
+      if (!duplicateRecord) return;
+      dupSumarBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/socavones/${duplicateRecord.id}/sumar`, {
+          method: 'POST',
+        });
+        const data = await res.json();
+        dupModal.close();
+        if (!res.ok) {
+          notifyState('error', 'Error al sumar reporte', data.error || 'Intenta de nuevo.');
+          return;
+        }
+        resetAfterSuccess(
+          `Reporte sumado al socavón #${data.socavon.id}`,
+          `Total acumulado: ${data.socavon.reportes_sumados} reportes.`
+        );
+      } catch {
+        dupModal.close();
+        notifyState('error', 'Error de conexión', 'No se pudo sumar al reporte existente.');
+      } finally {
+        dupSumarBtn.disabled = false;
+        pendingPayload = null;
+        duplicateRecord = null;
+      }
+    });
+
+    dupForceBtn.addEventListener('click', async () => {
+      if (!pendingPayload) return;
+      const forcedPayload = { ...pendingPayload, forzar_registro: true };
+      dupModal.close();
+      pendingPayload = null;
+      duplicateRecord = null;
+      await submitReport(forcedPayload);
+    });
+
+    // Inicializar estado
+    validateBoundingBoxUI(ZMG_CENTER[0], ZMG_CENTER[1], false);
+    reverseGeocode(ZMG_CENTER[0], ZMG_CENTER[1]);
+    initTurnstile();
+  </script>
+</body>
+</html>
